@@ -210,9 +210,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .assistant-content .metric { font-size: 16px; font-weight: 700; color: var(--accent); }
 .assistant-content .portrait {
-  float: right; width: 145px; height: 160px; object-fit: cover; object-position: center;
-  border-radius: 12px; margin: 0 0 14px 20px; border: 2px solid #30363D;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  float: right; width: 145px; height: 145px; object-fit: contain; object-position: center;
+  margin: 0 0 14px 20px; filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.6));
 }
 
 /* Attachment / Resume Card */
