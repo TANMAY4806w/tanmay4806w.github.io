@@ -144,6 +144,60 @@ AI Engineer with hands-on experience building production Generative AI and autom
     'contact.md': 'How do I contact Tanmay?'
   };
 
+  // Web Audio Mechanical Switch Synthesizer
+  const SoundFX = (() => {
+    let ctx = null;
+    let isMuted = localStorage.getItem('synapse_sound') === 'muted';
+    let lastPlay = 0;
+
+    function initCtx() {
+      if (!ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) ctx = new AudioCtx();
+      }
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume();
+      }
+    }
+
+    function playKeyClick() {
+      if (isMuted) return;
+      const nowMs = performance.now();
+      if (nowMs - lastPlay < 30) return;
+      lastPlay = nowMs;
+      initCtx();
+      if (!ctx) return;
+
+      try {
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        const pitch = 1450 + (Math.random() * 500 - 250);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(pitch, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.028);
+
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.028);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.032);
+      } catch (_) {}
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      localStorage.setItem('synapse_sound', isMuted ? 'muted' : 'enabled');
+      return isMuted;
+    }
+
+    return { playKeyClick, toggleMute, isMuted: () => isMuted, init: initCtx };
+  })();
+
   async function typeRichContent(content, generation) {
     const deferredCards = [...content.querySelectorAll('.attachment-card')];
     deferredCards.forEach(c => c.remove());
@@ -166,6 +220,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
       for (const char of item.characters) {
         if (generation !== chatGeneration) return false;
         item.node.appendData(char);
+        if (char.trim()) SoundFX.playKeyClick();
         await new Promise(r => setTimeout(r, delay));
       }
     }
@@ -313,6 +368,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
   }
 
   document.getElementById('shareButton').addEventListener('click', async () => {
+    SoundFX.init();
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({ title: document.title, text: 'Tanmay Patil — AI Engineer Portfolio', url: shareInput.value });
@@ -325,6 +381,26 @@ AI Engineer with hands-on experience building production Generative AI and autom
   document.getElementById('copyShareLinkButton').addEventListener('click', async () => {
     if (await copyPortfolioLink()) shareDialog.close();
   });
+
+  // Sound Toggle Button
+  const soundBtn = document.getElementById('soundToggleBtn');
+  function updateSoundBtn() {
+    if (!soundBtn) return;
+    const muted = SoundFX.isMuted();
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+    soundBtn.classList.toggle('muted', muted);
+    soundBtn.title = muted ? 'Mechanical keyboard sound: Muted (Click to enable)' : 'Mechanical keyboard sound: Active (Click to mute)';
+  }
+  if (soundBtn) {
+    updateSoundBtn();
+    soundBtn.addEventListener('click', () => {
+      SoundFX.init();
+      const muted = SoundFX.toggleMute();
+      updateSoundBtn();
+      if (!muted) SoundFX.playKeyClick();
+      showToast(muted ? '🔇 Typewriter sound muted' : '🔊 Mechanical keyboard sound enabled');
+    });
+  }
 
   // More Menu
   const moreButton = document.getElementById('moreButton');
@@ -436,6 +512,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
       if (generation !== chatGeneration) return;
       if (!answerStarted) { answerStarted = true; thinking.hidden = true; }
       answerLine.textContent += chunk;
+      SoundFX.playKeyClick();
     });
 
     let answer = '', typeAnswer = false, resourceFiles = [];

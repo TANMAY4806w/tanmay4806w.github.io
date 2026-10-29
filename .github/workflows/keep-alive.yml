@@ -13,6 +13,4 @@ jobs:
       - name: Ping Supabase URL
         run: |
           echo "Pinging Supabase to prevent free tier inactivity pause..."
-          # Replace with your actual Supabase URL or set SUPABASE_URL in GitHub repo secrets
-          SUPABASE_URL="${{ secrets.SUPABASE_PROJECT_URL || 'https://tanmay4806w.github.io' }}"
-          curl -s -f -m 15 "$SUPABASE_URL" || echo "Ping dispatched successfully."
+          curl -s -f -m 15 "https://hnpkbctycneamicrspfw.supabase.co/functions/v1/portfolio-chat" || echo "Ping dispatched successfully."
