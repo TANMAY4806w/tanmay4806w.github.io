@@ -163,29 +163,47 @@ AI Engineer with hands-on experience building production Generative AI and autom
     function playKeyClick() {
       if (isMuted) return;
       const nowMs = performance.now();
-      if (nowMs - lastPlay < 30) return;
+      // Natural typing cadence throttle: ~95ms minimum interval (~10 keystrokes/sec max)
+      // Eliminates the machine-gun buzzing vibration completely!
+      if (nowMs - lastPlay < 95) return;
       lastPlay = nowMs;
       initCtx();
       if (!ctx) return;
 
       try {
         const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
 
-        const pitch = 1450 + (Math.random() * 500 - 250);
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(pitch, now);
-        osc.frequency.exponentialRampToValueAtTime(320, now + 0.028);
+        // 1. Transient click (subtle high-frequency tick of keycap contact)
+        const oscClick = ctx.createOscillator();
+        const gainClick = ctx.createGain();
+        oscClick.type = 'triangle';
+        const clickPitch = 780 + (Math.random() * 160 - 80);
+        oscClick.frequency.setValueAtTime(clickPitch, now);
+        oscClick.frequency.exponentialRampToValueAtTime(320, now + 0.015);
 
-        gain.gain.setValueAtTime(0.04, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.028);
+        gainClick.gain.setValueAtTime(0.016, now);
+        gainClick.gain.exponentialRampToValueAtTime(0.0001, now + 0.015);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+        oscClick.connect(gainClick);
+        gainClick.connect(ctx.destination);
+        oscClick.start(now);
+        oscClick.stop(now + 0.016);
 
-        osc.start(now);
-        osc.stop(now + 0.032);
+        // 2. Body thud (warm bottom-out switch resonance)
+        const oscThud = ctx.createOscillator();
+        const gainThud = ctx.createGain();
+        oscThud.type = 'sine';
+        const thudPitch = 210 + (Math.random() * 30 - 15);
+        oscThud.frequency.setValueAtTime(thudPitch, now);
+        oscThud.frequency.exponentialRampToValueAtTime(80, now + 0.032);
+
+        gainThud.gain.setValueAtTime(0.02, now);
+        gainThud.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
+
+        oscThud.connect(gainThud);
+        gainThud.connect(ctx.destination);
+        oscThud.start(now);
+        oscThud.stop(now + 0.035);
       } catch (_) {}
     }
 
@@ -213,19 +231,34 @@ AI Engineer with hands-on experience building production Generative AI and autom
     const totalCharacters = textNodes.reduce((t, item) => t + item.characters.length, 0);
     if (!totalCharacters) { restoreCards(); return true; }
 
-    const delay = Math.min(12, Math.max(1, 2000 / totalCharacters));
     textNodes.forEach(item => { item.node.nodeValue = ''; });
 
+    // Readable, steady typewriter speed:
+    // Short answers: 1 char every 26ms (very readable and authentic)
+    // Medium content: 2 chars every 22ms
+    // Long sections: 3-4 chars every 18ms
+    const chunkSize = totalCharacters > 900 ? 4 : totalCharacters > 400 ? 2 : 1;
+    const delay = totalCharacters > 900 ? 18 : totalCharacters > 400 ? 22 : 26;
+
+    const chatScroll = document.querySelector('.chat-scroll');
+
     for (const item of textNodes) {
-      for (const char of item.characters) {
+      const chars = item.characters;
+      for (let i = 0; i < chars.length; i += chunkSize) {
         if (generation !== chatGeneration) return false;
-        item.node.appendData(char);
-        if (char.trim()) SoundFX.playKeyClick();
+        const slice = chars.slice(i, i + chunkSize).join('');
+        item.node.appendData(slice);
+        if (slice.trim()) SoundFX.playKeyClick();
         await new Promise(r => setTimeout(r, delay));
+
+        if (chatScroll && (chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < 140)) {
+          chatScroll.scrollTop = chatScroll.scrollHeight;
+        }
       }
     }
     if (generation !== chatGeneration) return false;
     restoreCards();
+    if (chatScroll) chatScroll.scrollTop = chatScroll.scrollHeight;
     return true;
   }
 
@@ -246,20 +279,24 @@ AI Engineer with hands-on experience building production Generative AI and autom
         <div class="assistant-content">${body}</div>
       </div>
     `;
-    if (innerWidth <= 720) setSidebarOpen(false);
+    if (innerWidth <= 768) setSidebarOpen(false);
     document.querySelector('.chat-scroll').scrollTop = document.querySelector('.chat-scroll').scrollHeight;
     void typeRichContent(response.querySelector('.assistant-content'), generation);
   }
 
-  tree.forEach(b => b.addEventListener('click', () => showFile(b.dataset.file)));
+  tree.forEach(b => b.addEventListener('click', () => {
+    showFile(b.dataset.file);
+    if (innerWidth <= 768) setSidebarOpen(false);
+  }));
 
   const chatInput = document.getElementById('chatInput');
   const sendButton = document.getElementById('sendButton');
 
   function resizeComposer() {
+    const maxH = innerWidth <= 640 ? 95 : 130;
     chatInput.style.height = 'auto';
-    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 130)}px`;
-    chatInput.style.overflowY = chatInput.scrollHeight > 130 ? 'auto' : 'hidden';
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, maxH)}px`;
+    chatInput.style.overflowY = chatInput.scrollHeight > maxH ? 'auto' : 'hidden';
   }
 
   function updateSendButton() {
@@ -280,11 +317,14 @@ AI Engineer with hands-on experience building production Generative AI and autom
     updateSendButton();
     resetAiStatus();
     chatInput.focus();
-    if (innerWidth <= 720) setSidebarOpen(false);
+    if (innerWidth <= 768) setSidebarOpen(false);
   }
 
   document.getElementById('newChatButton').addEventListener('click', startNewChat);
-  document.querySelector('.codex-brand').addEventListener('click', () => showFile('README.md'));
+  document.querySelector('.codex-brand').addEventListener('click', () => {
+    showFile('README.md');
+    if (innerWidth <= 768) setSidebarOpen(false);
+  });
 
   // Search Dialog
   const searchButton = document.getElementById('searchButton');
@@ -421,20 +461,28 @@ AI Engineer with hands-on experience building production Generative AI and autom
   document.addEventListener('click', e => { if (!e.target.closest('.more-wrap')) moreMenu.hidden = true; });
 
   // Suggestions & Sidebar
-  document.querySelectorAll('.suggestions button').forEach(b => b.addEventListener('click', () => showFile(b.dataset.file)));
+  document.querySelectorAll('.suggestions button').forEach(b => b.addEventListener('click', () => {
+    showFile(b.dataset.file);
+    if (innerWidth <= 768) setSidebarOpen(false);
+  }));
   const explorer = document.getElementById('explorer');
   const explorerToggle = document.getElementById('explorerToggle');
   const sidebarCollapseToggle = document.getElementById('sidebarCollapseToggle');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 
   function setSidebarOpen(isOpen) {
     explorer.classList.toggle('closed', !isOpen);
+    document.body.classList.toggle('sidebar-open', isOpen);
     for (const b of [explorerToggle, sidebarCollapseToggle]) {
-      b.setAttribute('aria-expanded', String(isOpen));
-      b.textContent = isOpen ? '◧' : '☰';
+      if (b) {
+        b.setAttribute('aria-expanded', String(isOpen));
+        b.textContent = isOpen ? '◧' : '☰';
+      }
     }
   }
-  explorerToggle.addEventListener('click', () => setSidebarOpen(explorer.classList.contains('closed')));
-  sidebarCollapseToggle.addEventListener('click', () => setSidebarOpen(false));
+  if (explorerToggle) explorerToggle.addEventListener('click', () => setSidebarOpen(explorer.classList.contains('closed')));
+  if (sidebarCollapseToggle) sidebarCollapseToggle.addEventListener('click', () => setSidebarOpen(false));
+  if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', () => setSidebarOpen(false));
 
   // Topics Matching
   const topics = [
@@ -616,11 +664,12 @@ AI Engineer with hands-on experience building production Generative AI and autom
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
 
-  let wasMobile = innerWidth <= 720;
+  let wasMobile = innerWidth <= 768;
   if (wasMobile) setSidebarOpen(false);
   window.addEventListener('resize', () => {
-    const isM = innerWidth <= 720;
+    const isM = innerWidth <= 768;
     if (isM !== wasMobile) { setSidebarOpen(!isM); wasMobile = isM; }
+    resizeComposer();
   });
 
   const welcomeText = document.getElementById('welcomeTitleText');
@@ -632,6 +681,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
     let pos = 0;
     const typing = setInterval(() => {
       welcomeText.textContent = prompt.slice(0, ++pos);
+      if (pos % 4 === 0) SoundFX.playKeyClick();
       if (pos === prompt.length) clearInterval(typing);
     }, 45);
   }
