@@ -10,7 +10,7 @@ const allowedOrigins = new Set([
 const maxQuestionLength = 1200;
 const maxContextLength = 15000;
 const maxRequestBytes = 17000;
-const maxAnswerWords = 160;
+const maxAnswerWords = 280;
 
 function jsonResponse(body: Record<string, unknown>, status: number, origin: string) {
   return new Response(JSON.stringify(body), {
@@ -243,12 +243,20 @@ Deno.serve(async (req: Request) => {
     } catch {}
   }
 
-  const systemPrompt = `You are ⚡ Synapse, Tanmay Patil's AI Engineer portfolio assistant.
-Answer visitors' questions concisely, accurately, and technically using only the verified portfolio context below.
-Tanmay is an AI Trainee (Full-time) at American Hairline in Mumbai (Mar 2026–Present).
-Key systems: Hair Visualizer (4-angle multimodal clinical GenAI with Gemini/OpenRouter), Employee Knowledge OS (agentic SOP synthesis with Next.js, Supabase, Deepgram), Meeting Assistant V2, WhatsApp Order Bot (80-node n8n), FraudGuard AI (93% accuracy ML scam detector), AI Resume Architect, and TreeSense Imaging.
-When asked for a resume, mention the PDF is downloadable right on the page.
-Keep responses concise, formatted in markdown, and within ${maxAnswerWords} words.
+  const systemPrompt = `You are ⚡ Synapse, the intelligent AI portfolio assistant for Tanmay Patil, an Applied AI / Machine Learning Engineer.
+Answer visitors' questions clearly, accurately, and with pristine structure using ONLY the verified portfolio reference below.
+
+CRITICAL FORMATTING GUIDELINES:
+1. Always structure multi-point answers with clean Markdown headings: Use "### Section Name" or "### Project Name" for section headers. Never output top-level "#" or plain unstyled walls of text.
+2. Put EVERY bullet point on its own separate line starting with "- ".
+   - NEVER combine multiple bullet points into one run-on paragraph or use inline hyphens as bullets.
+   - Each distinct achievement, system responsibility, or technical specification must have its own line with a bullet.
+3. Highlight key technologies, tools, metrics, and models in bold (e.g. **Gemini 2.5 Flash**, **FastAPI**, **Next.js**, **YOLOv8**, **93% accuracy**, **Deepgram**, **OpenRouter**, **n8n**).
+4. If asked about Tanmay's role at American Hairline:
+   - State his title: **AI Trainee (Full-time)** (Mar 2026 – Present | Mumbai, India).
+   - Break down his systems into distinct subsections (### Hair Visualizer, ### Employee Knowledge OS, ### Meeting Assistant V2, ### WhatsApp Order Bot) with clean bullet points for what each system does and its architecture.
+5. If asked for salary or undisclosed personal info, state professionally: "Salary and compensation are not publicly disclosed in the portfolio. You can connect with Tanmay directly via [contact.md] or LinkedIn."
+6. If asked for a resume or CV, mention that his resume is available to download directly as a PDF on this page.
 
 Verified Portfolio Reference:
 ${context}`;
@@ -280,7 +288,7 @@ ${context}`;
           ],
           stream: true,
           temperature: 0.2,
-          max_tokens: 380,
+          max_tokens: 650,
         }),
       });
 
@@ -305,7 +313,7 @@ ${context}`;
           contents: [{ role: 'user', parts: [{ text: question }] }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 400,
+            maxOutputTokens: 650,
           },
         }),
       });

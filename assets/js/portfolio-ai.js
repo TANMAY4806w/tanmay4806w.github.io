@@ -116,24 +116,87 @@ ${context}`;
   function renderInline(md, sectionNames, allowedLinks) {
     return escapeHtml(md)
       .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label, target) => {
-        if (sectionNames.has(target)) return `<a href="#${target}" class="ai-section-link" data-file="${target}" style="color:var(--accent); font-weight:600;">${label}</a>`;
-        if (allowedLinks.has(target)) return `<a href="${target}" target="_blank" rel="noreferrer" style="color:var(--accent-cyan);">${label} ↗</a>`;
+        if (sectionNames.has(target)) return `<a href="#${target}" class="ai-section-link" data-file="${target}" style="color:var(--accent); font-weight:600; text-decoration:underline; text-underline-offset:2px;">${label}</a>`;
+        if (allowedLinks.has(target)) return `<a href="${target}" target="_blank" rel="noreferrer" style="color:var(--accent-cyan); font-weight:500;">${label} ↗</a>`;
         return label;
       })
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`([^`]+)`/g, '<code style="background:#161B22; border:1px solid #30363D; color:var(--accent); padding:1px 5px; border-radius:4px;">$1</code>');
+      .replace(/`([^`]+)`/g, '<code style="background:#161B22; border:1px solid #30363D; color:var(--accent); padding:1px 5px; border-radius:4px; font-size:12px;">$1</code>');
   }
 
   function renderAnswer(md, sectionNames = [], allowedLinks = []) {
     const sections = new Set(sectionNames);
     const links = new Set(allowedLinks);
-    return String(md || '').trim().split(/\n\s*\n/).filter(Boolean).map(block => {
-      const lines = block.split('\n');
-      if (lines.every(line => /^\s*[-*]\s+/.test(line))) {
-        return `<ul style="margin:8px 0 12px 18px; line-height:1.65;">${lines.map(l => `<li>${renderInline(l.replace(/^\s*[-*]\s+/, ''), sections, links)}</li>`).join('')}</ul>`;
+
+    // 1. Normalize line endings and break inline dash bullets onto new lines:
+    let raw = String(md || '').replace(/\r\n/g, '\n').trim();
+    raw = raw.replace(/([.;!?])\s+[-*•]\s+/g, '$1\n- ');
+
+    const lines = raw.split('\n');
+    const out = [];
+    let inList = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) {
+        if (inList) { out.push('</ul>'); inList = false; }
+        continue;
       }
-      return `<p style="margin:8px 0 10px;">${renderInline(block, sections, links)}</p>`;
-    }).join('');
+
+      // Check Heading 1 (# ...)
+      if (/^#\s+(.*)$/.test(line)) {
+        if (inList) { out.push('</ul>'); inList = false; }
+        const hText = line.replace(/^#\s+/, '');
+        out.push(`<h2 class="ai-heading-1">${renderInline(hText, sections, links)}</h2>`);
+        continue;
+      }
+
+      // Check Heading 2 (## ...)
+      if (/^##\s+(.*)$/.test(line)) {
+        if (inList) { out.push('</ul>'); inList = false; }
+        const hText = line.replace(/^##\s+/, '');
+        out.push(`<h3 class="ai-heading-2">${renderInline(hText, sections, links)}</h3>`);
+        continue;
+      }
+
+      // Check Heading 3 (### ...)
+      if (/^###\s+(.*)$/.test(line)) {
+        if (inList) { out.push('</ul>'); inList = false; }
+        const hText = line.replace(/^###\s+/, '');
+        out.push(`<h4 class="ai-heading-3">${renderInline(hText, sections, links)}</h4>`);
+        continue;
+      }
+
+      // Check List Items (- ... or * ... or • ...)
+      if (/^[-*•]\s+(.*)$/.test(line)) {
+        if (!inList) {
+          out.push('<ul class="ai-bullet-list">');
+          inList = true;
+        }
+        const liText = line.replace(/^[-*•]\s+/, '');
+        out.push(`<li>${renderInline(liText, sections, links)}</li>`);
+        continue;
+      }
+
+      // Check project / section title pattern like: "Hair Visualizer - Built a 4-angle..."
+      const projectMatch = line.match(/^(\*\*[^*]+\*\*|[A-Z][A-Za-z0-9\s]{2,25})\s*[:–—]\s*(.*)$/);
+      if (projectMatch && !inList) {
+        const title = projectMatch[1].replace(/\*\*/g, '');
+        const rest = projectMatch[2].trim();
+        out.push(`<h4 class="ai-heading-3"><span class="ai-bullet-gem">◈</span> ${escapeHtml(title)}</h4>`);
+        if (rest) {
+          out.push(`<p class="ai-paragraph">${renderInline(rest, sections, links)}</p>`);
+        }
+        continue;
+      }
+
+      // Standard text line or paragraph
+      if (inList) { out.push('</ul>'); inList = false; }
+      out.push(`<p class="ai-paragraph">${renderInline(line, sections, links)}</p>`);
+    }
+
+    if (inList) out.push('</ul>');
+    return out.join('\n');
   }
 
   window.PortfolioAI = {

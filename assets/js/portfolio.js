@@ -216,6 +216,10 @@ AI Engineer with hands-on experience building production Generative AI and autom
     return { playKeyClick, toggleMute, isMuted: () => isMuted, init: initCtx };
   })();
 
+  ['click', 'keydown', 'pointerdown', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, () => SoundFX.init(), { once: true, passive: true });
+  });
+
   async function typeRichContent(content, generation) {
     const deferredCards = [...content.querySelectorAll('.attachment-card')];
     deferredCards.forEach(c => c.remove());
@@ -523,6 +527,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
   }
 
   async function send() {
+    SoundFX.init();
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendButton');
     const question = input.value.trim();
@@ -542,7 +547,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
     pending.innerHTML = `
       <div class="assistant-avatar">⚡</div>
       <div class="assistant-content">
-        <div class="thinking-indicator"><span class="thinking-label">⚡ Synapse is analyzing…</span></div>
+        <div class="thinking-indicator"><span class="thinking-label">⚡ Synapse is analyzing & formulating response…</span></div>
         <div class="assistant-answer" aria-live="polite"></div>
       </div>
     `;
@@ -558,11 +563,8 @@ AI Engineer with hands-on experience building production Generative AI and autom
     const thinking = pending.querySelector('.thinking-indicator');
     let answerStarted = false;
 
-    const streamer = window.PortfolioAI.createTextStreamer(chunk => {
+    const streamer = window.PortfolioAI.createTextStreamer(() => {
       if (generation !== chatGeneration) return;
-      if (!answerStarted) { answerStarted = true; thinking.hidden = true; }
-      answerLine.textContent += chunk;
-      SoundFX.playKeyClick();
     });
 
     let answer = '', typeAnswer = false, resourceFiles = [];
@@ -592,6 +594,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
             await streamer.finish();
             const rendered = window.PortfolioAI.renderAnswer(cloudAnswer, Object.keys(files), approvedExternalLinks);
             answer = rendered + renderResourceLinks(resourceFiles);
+            typeAnswer = true;
           } else {
             // Local fallback from verified sections
             const staticAns = buildStaticTopicAnswer(matches);
@@ -661,9 +664,9 @@ AI Engineer with hands-on experience building production Generative AI and autom
     }
   });
 
-  document.getElementById('sendButton').addEventListener('click', send);
+  document.getElementById('sendButton').addEventListener('click', () => { SoundFX.init(); send(); });
   document.getElementById('chatInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); SoundFX.init(); send(); }
   });
 
   let wasMobile = innerWidth <= 768;
