@@ -304,6 +304,8 @@ AI Engineer with hands-on experience building production Generative AI and autom
   }
 
   chatInput.addEventListener('input', () => { resizeComposer(); updateSendButton(); });
+  window.addEventListener('resize', resizeComposer);
+  resizeComposer();
 
   function startNewChat() {
     chatGeneration++;
@@ -578,7 +580,7 @@ AI Engineer with hands-on experience building production Generative AI and autom
           answer = `<p>I’m Tanmay’s portfolio AI assistant. I can help with his experience at <strong>American Hairline</strong>, his ML projects (<strong>FraudGuard AI</strong>, <strong>TreeSense</strong>), technical skills (FastAPI, LangChain, Supabase, n8n), or his resume.</p>`;
           typeAnswer = true;
         } else if (matches.length === 1 && matches[0].key === 'contact.md') {
-          setAiStatus('⚡ Synapse · direct answer');
+          setAiStatus('Synapse · direct answer');
           answer = `<p>Here are Tanmay’s contact details:</p>${render(files['contact.md'])}`;
           typeAnswer = true;
         } else {
@@ -627,12 +629,12 @@ AI Engineer with hands-on experience building production Generative AI and autom
   const chatEndpoint = document.querySelector('meta[name="portfolio-chat-endpoint"]')?.content.trim() || '';
 
   function setAiStatus(msg) { if (aiStatus) aiStatus.textContent = msg; }
-  function resetAiStatus() { setAiStatus('⚡ Synapse AI ready'); }
+  function resetAiStatus() { setAiStatus('Synapse AI ready'); }
 
   async function answerWithCloud(question, relevantFiles, onDelta) {
     if (!chatEndpoint) return null;
     try {
-      setAiStatus('⚡ Querying Synapse neural router…');
+      setAiStatus('Querying Synapse neural router…');
       const ans = await window.PortfolioAI.requestCloudAnswer(
         chatEndpoint,
         question,
@@ -640,16 +642,16 @@ AI Engineer with hands-on experience building production Generative AI and autom
         globalThis.fetch,
         onDelta
       );
-      if (ans) setAiStatus('⚡ Synapse AI ready');
+      if (ans) setAiStatus('Synapse AI ready');
       return ans;
     } catch (e) {
       lastCloudFailure = e;
-      setAiStatus('⚡ Answering via local portfolio knowledge…');
+      setAiStatus('Answering via local portfolio knowledge…');
       return null;
     }
   }
 
-  setAiStatus('⚡ Synapse AI ready');
+  setAiStatus('Synapse AI ready');
 
   response.addEventListener('click', e => {
     const link = e.target.closest('a[data-file]');
