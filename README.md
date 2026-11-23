@@ -10,19 +10,23 @@ An interactive, Codex-inspired developer workspace and AI assistant portfolio fo
 
 ## ⚡ Key Highlights Featured
 
-1. **American Hairline (AI Trainee, Full-Time):**
-   - **Hair Visualizer:** Multimodal GenAI consultation platform generating 4 synchronized camera angles (Front, Back, Side, Crown) with zero diffusion drift.
-   - **Employee Knowledge OS:** Agentic operational SOP synthesis platform built with Next.js, Supabase, Deepgram, and OpenRouter.
-   - **Meeting Assistant V2:** AI meeting intelligence with transcript chunking, action item extraction, and WhatsApp delivery on Webyne VPS.
-   - **WhatsApp Order Bot:** 80-node n8n conversational pipeline with WAHA, Deepgram, and LLaMA 3.1.
-2. **Arkham Archives (AI Developer Intern):**
-   - Transformer-based customer support chatbots with Hugging Face.
-3. **Machine Learning & Computer Vision Projects:**
-   - **FraudGuard AI:** Multilingual financial scam and Ponzi scheme detector with XGBoost & XLM-RoBERTa (93% accuracy).
-   - **AI Resume Architect:** ATS resume optimizer using Gemini API and LaTeX.
-   - **TreeSense Imaging:** YOLOv8 aerial tree detection and green-cover analysis.
-4. **Downloadable Resume:**
-   - One-page AI Engineer resume PDF embedded directly in `assets/files/Tanmay_Patil_Resume.pdf`.
+1. **Flagship Public Repositories (github.com/TANMAY4806w):**
+   - **ClauseGuard AI:** Autonomous Legal Contract Risk Intelligence Microservice (LangGraph, Qdrant Hybrid Search, FlashRank, Ragas, MCP).
+   - **Cynbit AutoScope AI:** Autonomous Cloud Solutions Architect & SOW Synthesizer (FastAPI, React 19, Pydantic v2, High-Contrast Mermaid).
+   - **VidyaSathi:** 15-Minute Gamified Multimodal Early Screening Engine (PRASUNEX INNOVATHON 2026, Next.js, Gemini API, Speech Analysis).
+   - **TreeSense Imaging:** Flagship Aerial Forestry Intelligence Platform (YOLOv11m, SAHI Sliced Tiling, NDVI/VARI Remote Sensing, Next.js 16).
+   - **SafeVision AI:** Real-Time Industrial Edge Video Analytics Platform (Zero-lag RTSP, YOLOv8 PPE detection, ByteTrack, TensorRT).
+   - **FraudGuard AI:** Multilingual Financial Fraud & Anomaly Detection (0.89 F1, 0.92 PR-AUC, XGBoost, XLM-RoBERTa, FastAPI).
+2. **American Hairline (AI Trainee / Engineer, Full-Time | Mar–Oct 2026):**
+   - **Employee Knowledge OS:** Agentic operational SOP synthesis platform built with Next.js, Supabase, Deepgram, and OpenRouter (72% token-overlap loop detection).
+   - **Meeting Assistant V2:** AI meeting intelligence with MapReduce transcript chunking, 16kHz Web Audio DSP, and WhatsApp delivery on Webyne Linux VPS.
+   - **Hair Visualizer:** Multimodal GenAI consultation platform generating 4 synchronized camera angles with two-pass sequential diffusion and 4-model vision failover.
+   - **WhatsApp Order Engine:** 80-node n8n conversational pipeline with WAHA, Deepgram, and LLaMA 3.1.
+   - **AHL Flow:** Double-entry stock ledger PWA with HMAC-SHA256 request signing and QR barcode scanning.
+3. **Arkham Archives (AI Developer Intern | Jun–Sep 2025):**
+   - Transformer-based customer support chatbots with Hugging Face and prompt evaluation harnesses.
+4. **Downloadable 1-Page Resume:**
+   - Updated AI/ML Engineer resume PDF embedded directly in `assets/files/Tanmay_Patil_Resume.pdf`.
 
 ---
 
