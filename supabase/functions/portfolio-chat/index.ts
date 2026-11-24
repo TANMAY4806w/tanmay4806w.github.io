@@ -8,9 +8,9 @@ const allowedOrigins = new Set([
 ]);
 
 const maxQuestionLength = 1200;
-const maxContextLength = 15000;
-const maxRequestBytes = 17000;
-const maxAnswerWords = 280;
+const maxContextLength = 32000;
+const maxRequestBytes = 36000;
+const maxAnswerWords = 350;
 
 function jsonResponse(body: Record<string, unknown>, status: number, origin: string) {
   return new Response(JSON.stringify(body), {

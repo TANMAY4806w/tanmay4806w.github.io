@@ -38,21 +38,63 @@
   };
 
   function render(md) {
-    let raw = md
-      .replace(/^### (.*)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.*)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.*)$/gm, '<h1>$1</h1>')
-      .replace(/^<div class="meta">(.*?)<\/div>$/gm, '<div class="meta">$1</div>')
-      .replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>')
-      .replace(/^- (.*)$/gm, '<li>$1</li>');
+    let raw = String(md || '').replace(/\r\n/g, '\n').trim();
+    const lines = raw.split('\n');
+    const out = [];
+    let inList = false;
 
-    raw = raw.split(/\n\n+/).map(block => {
-      if (/^<(h[1-3]|div|blockquote|li|img)/.test(block)) return block;
-      if (block.startsWith('<li>')) return `<ul>${block}</ul>`;
-      return `<p>${block}</p>`;
-    }).join('\n');
+    function closeList() {
+      if (inList) { out.push('</ul>'); inList = false; }
+    }
 
-    return raw
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) {
+        closeList();
+        continue;
+      }
+
+      if (line.startsWith('### ')) {
+        closeList();
+        out.push(`<h3>${line.slice(4)}</h3>`);
+        continue;
+      }
+      if (line.startsWith('## ')) {
+        closeList();
+        out.push(`<h2>${line.slice(3)}</h2>`);
+        continue;
+      }
+      if (line.startsWith('# ')) {
+        closeList();
+        out.push(`<h1>${line.slice(2)}</h1>`);
+        continue;
+      }
+      if (line.startsWith('> ')) {
+        closeList();
+        out.push(`<blockquote>${line.slice(2)}</blockquote>`);
+        continue;
+      }
+      if (line.startsWith('<div class="meta">') || line.startsWith('<div class="callout">')) {
+        closeList();
+        out.push(line);
+        continue;
+      }
+
+      if (/^[-*•]\s+/.test(line)) {
+        if (!inList) {
+          out.push('<ul class="ai-bullet-list">');
+          inList = true;
+        }
+        out.push(`<li>${line.replace(/^[-*•]\s+/, '')}</li>`);
+        continue;
+      }
+
+      closeList();
+      out.push(`<p>${line}</p>`);
+    }
+    closeList();
+
+    return out.join('\n')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, target) => {
@@ -88,8 +130,15 @@
       : '';
   }
 
-  function buildStaticTopicAnswer(topicsList) {
-    return topicsList.map(topic => render(files[topic.key])).join('<hr style="border:0; border-top:1px solid #30363D; margin:20px 0;">');
+  function buildSmartLocalAnswer(question, topicsList) {
+    if (!topicsList || !topicsList.length) {
+      return `<p>I’m Tanmay’s portfolio AI assistant. Tanmay Patil is an <strong>Applied AI / Machine Learning Engineer</strong> with 12 months verified industry experience across <strong>American Hairline</strong> and <strong>Arkham Archives</strong>, specializing in production GenAI and Computer Vision.</p>`;
+    }
+    // Return only the top matched section to keep response clean, focused, and fast
+    const topKey = topicsList[0].key;
+    const content = files[topKey];
+    if (!content) return `<p>Explore details in the sidebar.</p>`;
+    return render(content);
   }
 
   const resumeCard = () => `
@@ -207,39 +256,72 @@
     const textNodes = [];
     let node = walker.nextNode();
     while (node) {
-      textNodes.push({ node, characters: Array.from(node.nodeValue || '') });
+      const full = node.nodeValue || '';
+      textNodes.push({ node, full, characters: Array.from(full) });
       node = walker.nextNode();
     }
+
+    const restoreAll = () => {
+      for (const item of textNodes) {
+        item.node.nodeValue = item.full;
+      }
+      for (const el of content.querySelectorAll('*')) {
+        if (el.style.visibility === 'hidden') el.style.visibility = '';
+      }
+      restoreCards();
+    };
+
     const totalCharacters = textNodes.reduce((t, item) => t + item.characters.length, 0);
     if (!totalCharacters) { restoreCards(); return true; }
 
+    // Progressively hide future blocks so phantom empty bullets (✦) or empty code boxes are never visible
+    const blockElements = [...content.querySelectorAll('li, p, h1, h2, h3, h4, blockquote, .callout')];
+    blockElements.forEach((el, idx) => {
+      if (idx > 0) el.style.visibility = 'hidden';
+    });
+
+    // Clear text content of nodes to prepare for typing
     textNodes.forEach(item => { item.node.nodeValue = ''; });
 
-    // Readable, steady typewriter speed:
-    // Short answers: 1 char every 26ms (very readable and authentic)
-    // Medium content: 2 chars every 22ms
-    // Long sections: 3-4 chars every 18ms
     const chunkSize = totalCharacters > 900 ? 4 : totalCharacters > 400 ? 2 : 1;
-    const delay = totalCharacters > 900 ? 18 : totalCharacters > 400 ? 22 : 26;
-
+    const delay = totalCharacters > 900 ? 16 : totalCharacters > 400 ? 20 : 25;
     const chatScroll = document.querySelector('.chat-scroll');
 
-    for (const item of textNodes) {
-      const chars = item.characters;
-      for (let i = 0; i < chars.length; i += chunkSize) {
-        if (generation !== chatGeneration) return false;
-        const slice = chars.slice(i, i + chunkSize).join('');
-        item.node.appendData(slice);
-        if (slice.trim()) SoundFX.playKeyClick();
-        await new Promise(r => setTimeout(r, delay));
+    try {
+      for (const item of textNodes) {
+        const parentBlock = item.node.parentElement
+          ? item.node.parentElement.closest('li, p, h1, h2, h3, h4, blockquote, .callout')
+          : null;
+        if (parentBlock && parentBlock.style.visibility === 'hidden') {
+          parentBlock.style.visibility = '';
+        }
 
-        if (chatScroll && (chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < 140)) {
-          chatScroll.scrollTop = chatScroll.scrollHeight;
+        const chars = item.characters;
+        for (let i = 0; i < chars.length; i += chunkSize) {
+          if (generation !== chatGeneration) {
+            restoreAll();
+            return false;
+          }
+          const slice = chars.slice(i, i + chunkSize).join('');
+          item.node.appendData(slice);
+          if (slice.trim()) SoundFX.playKeyClick();
+          await new Promise(r => setTimeout(r, delay));
+
+          if (chatScroll && (chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < 160)) {
+            chatScroll.scrollTop = chatScroll.scrollHeight;
+          }
         }
       }
+    } catch (err) {
+      restoreAll();
+      return true;
     }
-    if (generation !== chatGeneration) return false;
-    restoreCards();
+
+    if (generation !== chatGeneration) {
+      restoreAll();
+      return false;
+    }
+    restoreAll();
     if (chatScroll) chatScroll.scrollTop = chatScroll.scrollHeight;
     return true;
   }
@@ -515,7 +597,7 @@
     const question = input.value.trim();
     if (!question || sendBtn.disabled) return;
 
-    const generation = chatGeneration;
+    const generation = ++chatGeneration;
     welcome.hidden = true;
     response.hidden = false;
     const safeQ = question.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -557,32 +639,26 @@
         typeAnswer = true;
       } else {
         let matches = matchTopics(question);
-        const asksAboutTanmay = /\b(tanmay|you|your|yourself|he|his|him|i|me|my|mine)\b/i.test(question);
-        if (!matches.length && asksAboutTanmay) matches = ['about.md', 'experience.md', 'toolkit.md'].map(key => ({ key }));
-
         if (!matches.length) {
-          answer = `<p>I’m Tanmay’s portfolio AI assistant. I can help with his experience at <strong>American Hairline</strong>, his ML projects (<strong>FraudGuard AI</strong>, <strong>TreeSense</strong>), technical skills (FastAPI, LangChain, Supabase, n8n), or his resume.</p>`;
-          typeAnswer = true;
-        } else if (matches.length === 1 && matches[0].key === 'contact.md') {
-          setAiStatus('Synapse · direct answer');
-          answer = `<p>Here are Tanmay’s contact details:</p>${render(files['contact.md'])}`;
+          matches = [{ key: 'experience.md' }, { key: 'projects.md' }];
+        } else if (matches.length > 2) {
+          matches = matches.slice(0, 2);
+        }
+
+        const relevantFiles = matches.map(t => t.key);
+        resourceFiles = relevantFiles.filter(k => k !== 'portfolio-profile.md');
+        const cloudAnswer = await answerWithCloud(question, relevantFiles, chunk => streamer.push(chunk));
+
+        if (cloudAnswer) {
+          await streamer.finish();
+          const rendered = window.PortfolioAI.renderAnswer(cloudAnswer, Object.keys(files), approvedExternalLinks);
+          answer = rendered + renderResourceLinks(resourceFiles);
           typeAnswer = true;
         } else {
-          const relevantFiles = matches.map(t => t.key);
-          resourceFiles = relevantFiles;
-          const cloudAnswer = await answerWithCloud(question, relevantFiles, chunk => streamer.push(chunk));
-
-          if (cloudAnswer) {
-            await streamer.finish();
-            const rendered = window.PortfolioAI.renderAnswer(cloudAnswer, Object.keys(files), approvedExternalLinks);
-            answer = rendered + renderResourceLinks(resourceFiles);
-            typeAnswer = true;
-          } else {
-            // Local fallback from verified sections
-            const staticAns = buildStaticTopicAnswer(matches);
-            answer = staticAns + renderResourceLinks(resourceFiles);
-            typeAnswer = true;
-          }
+          // Local fallback from verified sections
+          const staticAns = buildSmartLocalAnswer(question, matches);
+          answer = staticAns + renderResourceLinks(resourceFiles);
+          typeAnswer = true;
         }
       }
 

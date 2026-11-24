@@ -15,10 +15,33 @@
 
   function buildPortfolioContext(files, selectedFiles) {
     const selected = Array.isArray(selectedFiles) ? new Set(selectedFiles) : null;
-    return Object.entries(files)
-      .filter(([name]) => !selected || name === 'portfolio-profile.md' || selected.has(name))
-      .map(([name, content]) => `### ${name}\n${plainText(content)}`)
-      .join('\n\n');
+    const parts = [];
+
+    // 1. Always prioritize the master profile reference
+    if (files['portfolio-profile.md']) {
+      parts.push(`### portfolio-profile.md\n${plainText(files['portfolio-profile.md'])}`);
+    }
+
+    // 2. Add top relevant files
+    if (selected) {
+      for (const name of selected) {
+        if (name !== 'portfolio-profile.md' && files[name]) {
+          parts.push(`### ${name}\n${plainText(files[name])}`);
+        }
+      }
+    } else {
+      // If no specific selection, add experience and projects
+      for (const name of ['experience.md', 'projects.md']) {
+        if (files[name]) parts.push(`### ${name}\n${plainText(files[name])}`);
+      }
+    }
+
+    let result = parts.join('\n\n');
+    // Ensure lean context (under 12,000 chars) for ultra-fast LLM response
+    if (result.length > 12000) {
+      result = result.slice(0, 11800) + '\n\n...[Reference abridged]';
+    }
+    return result;
   }
 
   function createTextStreamer(onText) {
