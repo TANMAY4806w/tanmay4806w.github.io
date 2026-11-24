@@ -284,7 +284,33 @@ ${context}`;
     'Vary': 'Origin',
   };
 
-  // --- ATTEMPT 1: OpenRouter Free ---
+  // --- ATTEMPT 1: Google Gemini Flash (Primary) ---
+  if (geminiKey) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${geminiKey}&alt=sse`;
+      const geminiRes = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: question }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 750,
+          },
+        }),
+      });
+
+      if (geminiRes.ok && geminiRes.body) {
+        return new Response(streamGemini(geminiRes.body), { headers: responseHeaders });
+      }
+      console.warn('Gemini returned non-200. Status:', geminiRes.status, 'Failing over to OpenRouter...');
+    } catch (e) {
+      console.warn('Gemini request failed. Failing over to OpenRouter...', e);
+    }
+  }
+
+  // --- ATTEMPT 2: OpenRouter (Failover) ---
   if (openRouterKey) {
     try {
       const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -303,42 +329,16 @@ ${context}`;
           ],
           stream: true,
           temperature: 0.2,
-          max_tokens: 650,
+          max_tokens: 750,
         }),
       });
 
       if (openRouterRes.ok && openRouterRes.body) {
         return new Response(streamOpenRouter(openRouterRes.body), { headers: responseHeaders });
       }
-      console.warn('OpenRouter returned non-200. Status:', openRouterRes.status, 'Failing over to Gemini...');
+      console.warn('OpenRouter returned non-200. Status:', openRouterRes.status);
     } catch (e) {
-      console.warn('OpenRouter request failed. Failing over to Gemini...', e);
-    }
-  }
-
-  // --- ATTEMPT 2: Google Gemini Flash (Failover) ---
-  if (geminiKey) {
-    try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${geminiKey}&alt=sse`;
-      const geminiRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: question }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 650,
-          },
-        }),
-      });
-
-      if (geminiRes.ok && geminiRes.body) {
-        return new Response(streamGemini(geminiRes.body), { headers: responseHeaders });
-      }
-      console.warn('Gemini returned non-200. Status:', geminiRes.status);
-    } catch (e) {
-      console.warn('Gemini request failed:', e);
+      console.warn('OpenRouter request failed:', e);
     }
   }
 
