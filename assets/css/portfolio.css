@@ -253,6 +253,9 @@ body.sidebar-open .sidebar-backdrop {
   background: #161B22; border: 1px solid #30363D; padding: 2px 6px; border-radius: 4px;
   color: var(--accent); font-family: ui-monospace, monospace; font-size: 12px;
 }
+.assistant-content code:empty {
+  display: none !important;
+}
 .assistant-content .meta {
   font-size: 10px; letter-spacing: .12em; color: var(--accent-cyan); margin: 3px 0 10px; font-weight: 600;
 }
@@ -397,6 +400,18 @@ body.sidebar-open .sidebar-backdrop {
 /* =========================================================================
    RESPONSIVE DESIGN BREAKPOINTS (Tablets & Mobile Viewports)
    ========================================================================= */
+
+/* Desktop (> 768px): Smooth collapsible sidebar */
+@media (min-width: 769px) {
+  .sidebar.closed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-right: none !important;
+    visibility: hidden;
+  }
+}
 
 /* Tablet & Mobile (<= 768px): Convert sidebar to app-like sliding drawer */
 @media (max-width: 768px) {

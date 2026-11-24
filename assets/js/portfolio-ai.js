@@ -17,9 +17,12 @@
     const selected = Array.isArray(selectedFiles) ? new Set(selectedFiles) : null;
     const parts = [];
 
-    // 1. Always prioritize the master profile reference
+    // 1. Prioritize core profile summary
     if (files['portfolio-profile.md']) {
-      parts.push(`### portfolio-profile.md\n${plainText(files['portfolio-profile.md'])}`);
+      const fullProf = plainText(files['portfolio-profile.md']);
+      // If specific files are selected, use concise master summary to conserve token budget
+      const profExcerpt = selected && selected.size > 0 ? fullProf.slice(0, 1600) : fullProf;
+      parts.push(`### portfolio-profile.md\n${profExcerpt}`);
     }
 
     // 2. Add top relevant files
@@ -37,9 +40,9 @@
     }
 
     let result = parts.join('\n\n');
-    // Ensure lean context (under 12,000 chars) for ultra-fast LLM response
-    if (result.length > 12000) {
-      result = result.slice(0, 11800) + '\n\n...[Reference abridged]';
+    // Ensure lean context (under 7,500 chars) for ultra-fast, reliable LLM response
+    if (result.length > 7500) {
+      result = result.slice(0, 7200) + '\n\n...[Reference abridged]';
     }
     return result;
   }

@@ -131,6 +131,46 @@
   }
 
   function buildSmartLocalAnswer(question, topicsList) {
+    const qLower = (question || '').toLowerCase();
+
+    // 1. Confidentiality / compensation refusal
+    if (/\b(salary|ctc|compensation|pay|package|inr|lpa)\b/i.test(qLower)) {
+      return `<p>Salary and compensation are not publicly disclosed in the portfolio. You can connect with Tanmay directly via the <a href="#contact.md" data-file="contact.md">Contact</a> section or through <a href="https://linkedin.com/in/tanmay-patil-805049250" target="_blank" rel="noreferrer">LinkedIn ↗</a>.</p>`;
+    }
+
+    // 2. Adversarial / Jailbreak defense
+    if (/\b(dan|bomb|weapon|jailbreak|bypass|unrestricted|ignore all previous)\b/i.test(qLower)) {
+      return `<p>I am Synapse AI, dedicated to providing accurate information about Tanmay Patil’s verified AI engineering portfolio, technical systems, and background.</p>`;
+    }
+
+    // 3. Hallucination guard (e.g. Google, Apple, Microsoft employment)
+    if (/\b(google|microsoft|amazon|meta|apple|netflix)\b/i.test(qLower) && !/\b(model|gemini|llama)\b/i.test(qLower)) {
+      return `<p>The verified portfolio does not list employment at that company. Tanmay's verified industry experience includes <strong>American Hairline</strong> (AI Trainee / Engineer, Mar–Oct 2026) and <strong>Arkham Archives</strong> (AI Developer Intern, Jun–Sep 2025).</p>`;
+    }
+
+    // 4. Role & tenure at American Hairline
+    if (/\b(american hairline|ahl)\b/i.test(qLower) && /\b(role|tenure|title|position|experience)\b/i.test(qLower)) {
+      return `<h3>American Hairline — AI Trainee / Engineer (Full-Time)</h3>
+<p><strong>March 2026 – October 2026 (8 Months) · Mumbai, India</strong></p>
+<ul class="ai-bullet-list">
+  <li><strong>Employee Knowledge OS:</strong> Autonomous 12-dimension knowledge elicitation agent in Next.js 16 and Supabase with 72% token-overlap loop guardrail and automated SOP synthesis.</li>
+  <li><strong>Meeting Assistant V2:</strong> Asynchronous MapReduce speech intelligence pipeline with in-browser Web Audio DSP downsampling (75% payload cut) and automated WhatsApp task dispatch.</li>
+  <li><strong>AHL Hair Visualizer:</strong> 4-angle synchronized clinical hairstyle consultation platform with two-pass sequential diffusion and 4-model vision failover chain.</li>
+  <li><strong>WhatsApp Conversational Order Engine:</strong> 80-node n8n conversational pipeline with WAHA, Deepgram STT, and LLaMA 3.1 8B.</li>
+  <li><strong>AHL Flow:</strong> Double-entry inventory ledger PWA with HMAC-SHA256 cryptographic request signing and QR barcode scanning.</li>
+</ul>`;
+    }
+
+    // 5. Formal education
+    if (/\b(degree|education|college|university|cgpa|b\.?tech|graduation)\b/i.test(qLower)) {
+      return `<h3>Formal Academic Education</h3>
+<ul class="ai-bullet-list">
+  <li><strong>Degree:</strong> B.Tech in Artificial Intelligence & Machine Learning (Nov 2022 – May 2026).</li>
+  <li><strong>Institution:</strong> ALDEL Institute’s St. John College of Engineering and Management, University of Mumbai.</li>
+  <li><strong>Cumulative CGPA:</strong> <strong>7.68 / 10.0</strong> (Strong upward trajectory: <strong>9.64</strong> in Semester 7, <strong>9.52</strong> in Semester 8).</li>
+</ul>`;
+    }
+
     if (!topicsList || !topicsList.length) {
       return `<p>I’m Tanmay’s portfolio AI assistant. Tanmay Patil is an <strong>Applied AI / Machine Learning Engineer</strong> with 12 months verified industry experience across <strong>American Hairline</strong> and <strong>Arkham Archives</strong>, specializing in production GenAI and Computer Vision.</p>`;
     }
@@ -275,7 +315,7 @@
     if (!totalCharacters) { restoreCards(); return true; }
 
     // Progressively hide future blocks so phantom empty bullets (✦) or empty code boxes are never visible
-    const blockElements = [...content.querySelectorAll('li, p, h1, h2, h3, h4, blockquote, .callout')];
+    const blockElements = [...content.querySelectorAll('li, p, h1, h2, h3, h4, blockquote, .callout, code, pre')];
     blockElements.forEach((el, idx) => {
       if (idx > 0) el.style.visibility = 'hidden';
     });
@@ -289,11 +329,10 @@
 
     try {
       for (const item of textNodes) {
-        const parentBlock = item.node.parentElement
-          ? item.node.parentElement.closest('li, p, h1, h2, h3, h4, blockquote, .callout')
-          : null;
-        if (parentBlock && parentBlock.style.visibility === 'hidden') {
-          parentBlock.style.visibility = '';
+        let cur = item.node.parentElement;
+        while (cur && cur !== content) {
+          if (cur.style.visibility === 'hidden') cur.style.visibility = '';
+          cur = cur.parentElement;
         }
 
         const chars = item.characters;
@@ -421,7 +460,11 @@
       res.type = 'button';
       res.className = 'search-result';
       res.textContent = b.textContent.replace('◌', '').trim();
-      res.addEventListener('click', () => { showFile(b.dataset.file); searchDialog.close(); });
+      res.addEventListener('click', () => {
+        showFile(b.dataset.file);
+        searchDialog.close();
+        if (innerWidth <= 768) setSidebarOpen(false);
+      });
       searchResults.append(res);
     });
   }
@@ -440,6 +483,12 @@
     if (e.key === 'Enter') {
       const first = searchResults.querySelector('.search-result');
       if (first) { e.preventDefault(); first.click(); }
+    }
+  });
+  searchDialog.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      searchDialog.close();
     }
   });
   searchDialog.addEventListener('click', e => { if (e.target === searchDialog) searchDialog.close(); });

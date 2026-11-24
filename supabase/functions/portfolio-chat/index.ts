@@ -93,6 +93,7 @@ function streamOpenRouter(upstreamBody: ReadableStream<Uint8Array>): ReadableStr
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       let buffer = '';
+      let tokenCount = 0;
       const send = (event: string, data: Record<string, unknown>) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
@@ -111,22 +112,43 @@ function streamOpenRouter(upstreamBody: ReadableStream<Uint8Array>): ReadableStr
               .join('\n');
             if (!data) continue;
             if (data === '[DONE]') {
-              send('done', { finishReason: 'stop', provider: 'openrouter' });
+              if (tokenCount === 0) {
+                send('error', { code: 'EMPTY_STREAM', message: 'No tokens received from provider' });
+              } else {
+                send('done', { finishReason: 'stop', provider: 'openrouter' });
+              }
               controller.close();
               return;
             }
             try {
               const payload = JSON.parse(data);
+              if (payload.error) {
+                send('error', { code: 'PROVIDER_ERROR', message: payload.error.message || 'OpenRouter error' });
+                controller.close();
+                return;
+              }
               const chunk = payload.choices?.[0]?.delta?.content || '';
-              if (chunk) send('delta', { text: chunk });
+              if (chunk) {
+                tokenCount++;
+                send('delta', { text: chunk });
+              }
             } catch {}
           }
           if (done) break;
         }
-        send('done', { finishReason: 'stop', provider: 'openrouter' });
+        if (tokenCount === 0) {
+          send('error', { code: 'EMPTY_STREAM', message: 'No tokens received from provider' });
+        } else {
+          send('done', { finishReason: 'stop', provider: 'openrouter' });
+        }
         controller.close();
       } catch {
-        try { controller.close(); } catch {}
+        try {
+          if (tokenCount === 0) {
+            send('error', { code: 'STREAM_EXCEPTION', message: 'Stream failed' });
+          }
+          controller.close();
+        } catch {}
       } finally {
         reader.releaseLock();
       }
@@ -143,6 +165,7 @@ function streamGemini(upstreamBody: ReadableStream<Uint8Array>): ReadableStream<
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       let buffer = '';
+      let tokenCount = 0;
       const send = (event: string, data: Record<string, unknown>) => {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
@@ -162,10 +185,22 @@ function streamGemini(upstreamBody: ReadableStream<Uint8Array>): ReadableStream<
             if (!data) continue;
             try {
               const payload = JSON.parse(data);
+              if (payload.error) {
+                send('error', { code: 'GEMINI_ERROR', message: payload.error.message || 'Gemini error' });
+                controller.close();
+                return;
+              }
               const text = payload.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (text) send('delta', { text });
+              if (text) {
+                tokenCount++;
+                send('delta', { text });
+              }
               if (payload.candidates?.[0]?.finishReason) {
-                send('done', { finishReason: payload.candidates[0].finishReason, provider: 'gemini' });
+                if (tokenCount === 0) {
+                  send('error', { code: 'EMPTY_STREAM', message: 'Gemini returned no tokens' });
+                } else {
+                  send('done', { finishReason: payload.candidates[0].finishReason, provider: 'gemini' });
+                }
                 controller.close();
                 return;
               }
@@ -173,10 +208,19 @@ function streamGemini(upstreamBody: ReadableStream<Uint8Array>): ReadableStream<
           }
           if (done) break;
         }
-        send('done', { finishReason: 'stop', provider: 'gemini' });
+        if (tokenCount === 0) {
+          send('error', { code: 'EMPTY_STREAM', message: 'Gemini returned no tokens' });
+        } else {
+          send('done', { finishReason: 'stop', provider: 'gemini' });
+        }
         controller.close();
       } catch {
-        try { controller.close(); } catch {}
+        try {
+          if (tokenCount === 0) {
+            send('error', { code: 'STREAM_EXCEPTION', message: 'Gemini stream failed' });
+          }
+          controller.close();
+        } catch {}
       } finally {
         reader.releaseLock();
       }
@@ -284,35 +328,54 @@ ${context}`;
     'Vary': 'Origin',
   };
 
-  // --- ATTEMPT 1: Google Gemini Flash (Primary) ---
+  let lastGeminiDiag = 'not-attempted';
+  // --- ATTEMPT 1: Google Gemini (Primary) ---
   if (geminiKey) {
     try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${geminiKey}&alt=sse`;
-      const geminiRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: question }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 750,
-          },
-        }),
-      });
+      const candidateModels = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-exp',
+        'gemini-1.5-pro',
+        'gemini-1.5-pro-latest',
+      ];
+      let geminiRes: Response | null = null;
 
-      if (geminiRes.ok && geminiRes.body) {
-        return new Response(streamGemini(geminiRes.body), { headers: responseHeaders });
+      for (const mName of candidateModels) {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${mName}:streamGenerateContent?key=${geminiKey}&alt=sse`;
+        const res = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: question }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 750,
+            },
+          }),
+        });
+
+        if (res.ok && res.body) {
+          return new Response(streamGemini(res.body), { headers: responseHeaders });
+        }
+        const err = await res.text();
+        lastGeminiDiag = `${mName}: ${res.status} ${err.slice(0, 100)}`;
       }
-      console.warn('Gemini returned non-200. Status:', geminiRes.status, 'Failing over to OpenRouter...');
     } catch (e) {
-      console.warn('Gemini request failed. Failing over to OpenRouter...', e);
+      lastGeminiDiag = `Exception: ${String(e)}`;
+      console.warn('Gemini request failed:', e);
     }
   }
 
   // --- ATTEMPT 2: OpenRouter (Failover) ---
   if (openRouterKey) {
     try {
+      const openRouterHeaders = {
+        ...responseHeaders,
+        'X-Gemini-Diag': encodeURIComponent(lastGeminiDiag.slice(0, 250)),
+      };
       const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -334,11 +397,14 @@ ${context}`;
       });
 
       if (openRouterRes.ok && openRouterRes.body) {
-        return new Response(streamOpenRouter(openRouterRes.body), { headers: responseHeaders });
+        return new Response(streamOpenRouter(openRouterRes.body), { headers: openRouterHeaders });
       }
-      console.warn('OpenRouter returned non-200. Status:', openRouterRes.status);
+      const openRouterErr = await openRouterRes.text();
+      console.warn('OpenRouter non-200:', openRouterRes.status, openRouterErr);
+      lastGeminiDiag += ` | OpenRouter ${openRouterRes.status}: ${openRouterErr.slice(0, 150)}`;
     } catch (e) {
       console.warn('OpenRouter request failed:', e);
+      lastGeminiDiag += ` | OpenRouter ex: ${String(e)}`;
     }
   }
 
@@ -346,5 +412,6 @@ ${context}`;
   return jsonResponse({
     error: 'All cloud LLM providers are currently rate-limited or unavailable',
     code: 'PROVIDERS_RATE_LIMITED',
+    diagnostic: lastGeminiDiag
   }, 429, origin);
 });
